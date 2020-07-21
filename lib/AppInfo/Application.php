@@ -27,6 +27,7 @@ namespace OCA\FaceRecognition\AppInfo;
 use OCP\AppFramework\App;
 use OCP\AppFramework\IAppContainer;
 use OCP\EventDispatcher\IEventDispatcher;
+use OCP\EventDispatcher\GenericEvent;
 use OCP\Files\IRootFolder;
 use OCP\Files\Node;
 use OCP\IUserManager;
@@ -35,6 +36,8 @@ use OCA\Files\Event\LoadSidebar;
 
 use OCA\FaceRecognition\Listener\LoadSidebarListener;
 use OCA\FaceRecognition\Watcher;
+use OCA\FaceRecognition\Search\Provider;
+
 
 class Application extends App {
 
@@ -85,6 +88,23 @@ class Application extends App {
 		$this->getContainer()->getServer()->getSearch()->registerProvider(
 			'OCA\FaceRecognition\Search\Provider',
 			array('app'=>'facerecognition', 'apps' => array('files'))
+		);
+
+		// The Files_FullTextSearch takes over the search interface and
+		// we're unable to use the above search provider.
+
+		// TODO: Optimize by handling this all using indexing/search query events.
+		// The person name will be added to the index once and we will avoid the
+		// slower database search here.
+
+		// Add person name search results to those returned by Files_FullTextSearch
+		\OC::$server->getEventDispatcher()->addListener(
+			'\OCA\Files_FullTextSearch::onSearchResult',
+			function(GenericEvent $e) {
+				$result = $e->getArgument('result');
+				$provider = new Provider();
+				$provider->handleFullTextSearch($result);
+			}
 		);
 	}
 
